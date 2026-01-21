@@ -121,13 +121,44 @@ const NODE_HEALTH_HISTORY = [
   { time: '10:30', temp: 65, util: 0 },
 ];
 
-const NodeHealthDetail: React.FC<{ nodeIdx: number; blockLabel: string }> = ({ nodeIdx, blockLabel }) => {
+const NodeHealthDetail: React.FC<{ 
+  nodeIdx: number; 
+  blockLabel: string;
+  status: 'healthy' | 'degraded' | 'unhealthy'
+}> = ({ nodeIdx, blockLabel, status }) => {
+  const config = {
+    healthy: {
+      color: 'bg-cyan-300',
+      textColor: 'text-cyan-600',
+      label: 'HEALTHY',
+      detailLabel: 'Status',
+      detailValue: 'Normal',
+      action: 'None needed'
+    },
+    degraded: {
+      color: 'bg-amber-400',
+      textColor: 'text-amber-600',
+      label: 'DEGRADED',
+      detailLabel: 'Straggler node',
+      detailValue: 'High Latency',
+      action: <button className="text-[10px] font-bold text-[#1967D2] hover:underline">Investigate metrics</button>
+    },
+    unhealthy: {
+      color: 'bg-rose-500',
+      textColor: 'text-rose-600',
+      label: 'UNHEALTHY',
+      detailLabel: 'Error Code',
+      detailValue: 'XID 31 (Memory)',
+      action: <button className="text-[10px] font-bold text-[#1967D2] hover:underline">Drain & Replace</button>
+    }
+  }[status];
+
   return (
     <div className="col-span-full mt-4 bg-slate-50 border border-slate-200 rounded-lg p-4 animate-fadeIn">
       <div className="flex justify-between items-start mb-4">
         <div>
           <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-rose-500" />
+            <div className={`w-2 h-2 rounded-full ${config.color}`} />
             Node {nodeIdx} Health Diagnostics ({blockLabel})
           </h4>
           <p className="text-[10px] text-slate-500">Real-time telemetry and error markers</p>
@@ -164,30 +195,34 @@ const NodeHealthDetail: React.FC<{ nodeIdx: number; blockLabel: string }> = ({ n
             />
             
             {/* Markers */}
-            <ReferenceLine 
-              x="09:45" 
-              stroke="#f43f5e" 
-              strokeDasharray="3 3"
-              label={{ 
-                value: 'Thermal Spike', 
-                position: 'top', 
-                fill: '#f43f5e', 
-                fontSize: 10, 
-                fontWeight: 'bold' 
-              }} 
-            />
-            <ReferenceLine 
-              x="10:15" 
-              stroke="#e11d48" 
-              strokeWidth={2}
-              label={{ 
-                value: 'XID Error', 
-                position: 'top', 
-                fill: '#e11d48', 
-                fontSize: 10, 
-                fontWeight: 'bold' 
-              }} 
-            />
+            {status !== 'healthy' && (
+              <>
+                <ReferenceLine 
+                  x="09:45" 
+                  stroke="#f43f5e" 
+                  strokeDasharray="3 3"
+                  label={{ 
+                    value: 'Thermal Spike', 
+                    position: 'top', 
+                    fill: '#f43f5e', 
+                    fontSize: 10, 
+                    fontWeight: 'bold' 
+                  }} 
+                />
+                <ReferenceLine 
+                  x="10:15" 
+                  stroke="#e11d48" 
+                  strokeWidth={2}
+                  label={{ 
+                    value: 'XID Error', 
+                    position: 'top', 
+                    fill: '#e11d48', 
+                    fontSize: 10, 
+                    fontWeight: 'bold' 
+                  }} 
+                />
+              </>
+            )}
 
             <Line 
               type="monotone" 
@@ -212,15 +247,15 @@ const NodeHealthDetail: React.FC<{ nodeIdx: number; blockLabel: string }> = ({ n
       <div className="mt-4 grid grid-cols-3 gap-4">
         <div className="bg-white p-2 rounded border border-slate-200">
           <div className="text-[9px] text-slate-400 uppercase font-bold">Status</div>
-          <div className="text-xs font-bold text-rose-600">UNHEALTHY</div>
+          <div className={`text-xs font-bold ${config.textColor}`}>{config.label}</div>
         </div>
         <div className="bg-white p-2 rounded border border-slate-200">
-          <div className="text-[9px] text-slate-400 uppercase font-bold">Error Code</div>
-          <div className="text-xs font-bold text-slate-700">XID 31 (Memory)</div>
+          <div className="text-[9px] text-slate-400 uppercase font-bold">{config.detailLabel}</div>
+          <div className="text-xs font-bold text-slate-700">{config.detailValue}</div>
         </div>
         <div className="bg-white p-2 rounded border border-slate-200">
           <div className="text-[9px] text-slate-400 uppercase font-bold">Action</div>
-          <button className="text-[10px] font-bold text-[#1967D2] hover:underline">Drain & Replace</button>
+          <div className="text-[10px] font-bold text-slate-500">{config.action}</div>
         </div>
       </div>
     </div>
@@ -229,13 +264,18 @@ const NodeHealthDetail: React.FC<{ nodeIdx: number; blockLabel: string }> = ({ n
 
 export const ClusterDetail: React.FC<ClusterDetailProps> = ({ clusterId, onBack }) => {
   const [superBlocks, setSuperBlocks] = useState(MOCK_SUPER_BLOCKS);
-  const [selectedNode, setSelectedNode] = useState<{sbId: string, bId: string, idx: number} | null>(() => {
+  const [selectedNode, setSelectedNode] = useState<{
+    sbId: string, 
+    bId: string, 
+    idx: number,
+    status: 'healthy' | 'degraded' | 'unhealthy'
+  } | null>(() => {
     // Auto-select first unhealthy node if navigating from a warning cluster
     const sb1 = MOCK_SUPER_BLOCKS[0];
     const b1 = sb1.blocks[0];
     const unhealthyIdx = b1.nodes.findIndex(n => n === 'unhealthy');
     if (unhealthyIdx !== -1) {
-      return { sbId: sb1.id, bId: b1.id, idx: unhealthyIdx };
+      return { sbId: sb1.id, bId: b1.id, idx: unhealthyIdx, status: 'unhealthy' };
     }
     return null;
   });
@@ -464,12 +504,16 @@ export const ClusterDetail: React.FC<ClusterDetailProps> = ({ clusterId, onBack 
                             <div className="flex flex-wrap gap-1">
                                 {block.nodes.map((status, idx) => {
                                     const isSelected = selectedNode?.sbId === sb.id && selectedNode?.bId === block.id && selectedNode?.idx === idx;
+                                    const mappedStatus: 'healthy' | 'degraded' | 'unhealthy' = 
+                                      status === 'unhealthy' ? 'unhealthy' :
+                                      status === 'suspected' ? 'degraded' : 'healthy';
+
                                     return (
                                         <div 
                                           key={idx}
                                           onClick={() => {
                                             if (isSelected) setSelectedNode(null);
-                                            else setSelectedNode({ sbId: sb.id, bId: block.id, idx });
+                                            else setSelectedNode({ sbId: sb.id, bId: block.id, idx, status: mappedStatus });
                                           }}
                                           className={`
                                             w-8 h-6 rounded-[2px] cursor-pointer transition-all relative
@@ -492,6 +536,7 @@ export const ClusterDetail: React.FC<ClusterDetailProps> = ({ clusterId, onBack 
                       <NodeHealthDetail 
                         nodeIdx={selectedNode.idx} 
                         blockLabel={sb.blocks.find(b => b.id === selectedNode.bId)?.label || ''} 
+                        status={selectedNode.status}
                       />
                     )}
                  </div>
