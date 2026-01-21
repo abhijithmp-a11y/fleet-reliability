@@ -260,6 +260,98 @@ const NodeHealthDetail: React.FC<{
   );
 };
 
+const NodeMaintenanceDetail: React.FC<{ 
+  nodeIdx: number; 
+  blockLabel: string; 
+  status: 'uptodate' | 'available' | 'inprogress' 
+}> = ({ nodeIdx, blockLabel, status }) => {
+  const config = {
+    uptodate: {
+      color: 'bg-blue-300',
+      textColor: 'text-blue-600',
+      label: 'UP TO DATE',
+      driver: 'v535.154.05',
+      gce: 'v20240214',
+      action: 'None needed'
+    },
+    available: {
+      color: 'bg-amber-400',
+      textColor: 'text-amber-600',
+      label: 'UPDATE AVAILABLE',
+      driver: 'v535.129.03',
+      nextDriver: 'v535.154.05',
+      gce: 'v20240110',
+      nextGce: 'v20240214',
+      action: <button className="text-[10px] font-bold text-[#1967D2] hover:underline">Schedule update</button>
+    },
+    inprogress: {
+      color: 'bg-pink-400',
+      textColor: 'text-pink-600',
+      label: 'UPDATING',
+      driver: 'v535.154.05 (Applying...)',
+      gce: 'v20240214 (Applying...)',
+      action: <div className="flex items-center gap-1 text-pink-500 animate-pulse"><RefreshCw size={10} /> In progress</div>
+    }
+  }[status];
+
+  return (
+    <div className="col-span-full mt-4 bg-slate-50 border border-slate-200 rounded-lg p-4 animate-fadeIn">
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${config.color}`} />
+            Node {nodeIdx} Software Stack ({blockLabel})
+          </h4>
+          <p className="text-[10px] text-slate-500">Current firmware and orchestration versions</p>
+        </div>
+        <div className="bg-white px-2 py-1 rounded border border-slate-200 text-[10px] font-bold text-slate-500">
+          OS: Ubuntu 22.04 LTS
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div className="bg-white p-3 rounded border border-slate-200 shadow-sm">
+          <div className="text-[9px] text-slate-400 uppercase font-bold mb-2">GPU Driver</div>
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-mono font-bold text-slate-700">{config.driver}</div>
+            {status === 'available' && (
+              <div className="flex items-center gap-1 text-[10px] text-blue-600 font-bold">
+                <SkipForward size={10} /> {config.nextDriver}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="bg-white p-3 rounded border border-slate-200 shadow-sm">
+          <div className="text-[9px] text-slate-400 uppercase font-bold mb-2">GCE Software</div>
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-mono font-bold text-slate-700">{config.gce}</div>
+            {status === 'available' && (
+              <div className="flex items-center gap-1 text-[10px] text-blue-600 font-bold">
+                <SkipForward size={10} /> {config.nextGce}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-white p-2 rounded border border-slate-200">
+          <div className="text-[9px] text-slate-400 uppercase font-bold">Status</div>
+          <div className={`text-xs font-bold ${config.textColor}`}>{config.label}</div>
+        </div>
+        <div className="bg-white p-2 rounded border border-slate-200">
+          <div className="text-[9px] text-slate-400 uppercase font-bold">Last Reboot</div>
+          <div className="text-xs font-bold text-slate-700">12 days ago</div>
+        </div>
+        <div className="bg-white p-2 rounded border border-slate-200">
+          <div className="text-[9px] text-slate-400 uppercase font-bold">Action</div>
+          <div className="text-[10px] font-bold text-slate-500">{config.action}</div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const ClusterDirectorV2: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('HEALTH');
   const [superBlocks, setSuperBlocks] = useState(MOCK_BLOCKS);
@@ -267,7 +359,7 @@ export const ClusterDirectorV2: React.FC = () => {
     sbId: string; 
     blockId: string; 
     nodeIdx: number;
-    status: 'healthy' | 'degraded' | 'unhealthy';
+    status: any;
   } | null>(() => {
     // Auto-select first unhealthy node in Super Block 1 for demo purposes
     const sb1 = MOCK_BLOCKS[0];
@@ -279,6 +371,11 @@ export const ClusterDirectorV2: React.FC = () => {
   const toggleSuperBlock = (id: string) => {
     setSuperBlocks(prev => prev.map(sb => sb.id === id ? { ...sb, isOpen: !sb.isOpen } : sb));
     if (selectedNode?.sbId === id) setSelectedNode(null);
+  };
+
+  const handleTabChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    setSelectedNode(null); // Reset selection when switching modes to avoid status mismatch
   };
 
   const getNodeColor = (blockIdx: number, nodeIdx: number, mode: ViewMode) => {
@@ -503,19 +600,19 @@ export const ClusterDirectorV2: React.FC = () => {
 
          <div className="flex bg-white rounded border border-[#1967D2]/20 shadow-sm overflow-hidden">
              <button 
-                onClick={() => setViewMode('HEALTH')}
+                onClick={() => handleTabChange('HEALTH')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase transition-colors border-r border-[#1967D2]/10 ${viewMode === 'HEALTH' ? 'bg-[#1967D2]/10 text-[#1967D2]' : 'hover:bg-slate-50 text-[#1967D2]'}`}
              >
                 <Shield size={12} /> Health
              </button>
              <button 
-                onClick={() => setViewMode('UTILIZATION')}
+                onClick={() => handleTabChange('UTILIZATION')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase transition-colors border-r border-[#1967D2]/10 ${viewMode === 'UTILIZATION' ? 'bg-[#1967D2]/10 text-[#1967D2]' : 'hover:bg-slate-50 text-[#1967D2]'}`}
              >
                 <LayoutGrid size={12} /> Utilization
              </button>
              <button 
-                onClick={() => setViewMode('MAINTENANCE')}
+                onClick={() => handleTabChange('MAINTENANCE')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase transition-colors ${viewMode === 'MAINTENANCE' ? 'bg-[#1967D2]/10 text-[#1967D2]' : 'hover:bg-slate-50 text-[#1967D2]'}`}
              >
                 <RefreshCw size={12} /> Maintenance
@@ -631,15 +728,18 @@ export const ClusterDirectorV2: React.FC = () => {
                           <div className="flex flex-wrap gap-1">
                              {block.nodes.map((_, nodeIdx) => {
                                const color = getNodeColor(blockIdx, nodeIdx, viewMode);
-                               const isUnhealthy = color === COLORS.health.unhealthy;
-                               const isSuspected = color === COLORS.health.suspected;
-                               const isHealthy = color === COLORS.health.healthy;
-                               
-                               const status: 'healthy' | 'degraded' | 'unhealthy' = 
-                                 isUnhealthy ? 'unhealthy' : 
-                                 isSuspected ? 'degraded' : 'healthy';
-
                                const isSelected = selectedNode?.sbId === sb.id && selectedNode?.blockId === block.id && selectedNode?.nodeIdx === nodeIdx;
+                               
+                               let status: any;
+                               if (viewMode === 'HEALTH') {
+                                 status = color === COLORS.health.unhealthy ? 'unhealthy' : 
+                                          color === COLORS.health.suspected ? 'degraded' : 'healthy';
+                               } else if (viewMode === 'MAINTENANCE') {
+                                 status = color === COLORS.maintenance.inprogress ? 'inprogress' :
+                                          color === COLORS.maintenance.available ? 'available' : 'uptodate';
+                               } else {
+                                 status = 'healthy';
+                               }
                                
                                return (
                                  <div 
@@ -659,8 +759,17 @@ export const ClusterDirectorV2: React.FC = () => {
                     ))}
 
                     {/* Inline Health Detail */}
-                    {selectedNode && selectedNode.sbId === sb.id && (
+                    {selectedNode && selectedNode.sbId === sb.id && viewMode === 'HEALTH' && (
                       <NodeHealthDetail 
+                        nodeIdx={selectedNode.nodeIdx} 
+                        blockLabel={sb.blocks.find(b => b.id === selectedNode.blockId)?.label || ''} 
+                        status={selectedNode.status}
+                      />
+                    )}
+
+                    {/* Inline Maintenance Detail */}
+                    {selectedNode && selectedNode.sbId === sb.id && viewMode === 'MAINTENANCE' && (
+                      <NodeMaintenanceDetail 
                         nodeIdx={selectedNode.nodeIdx} 
                         blockLabel={sb.blocks.find(b => b.id === selectedNode.blockId)?.label || ''} 
                         status={selectedNode.status}

@@ -262,13 +262,106 @@ const NodeHealthDetail: React.FC<{
   );
 };
 
+const NodeMaintenanceDetail: React.FC<{ 
+  nodeIdx: number; 
+  blockLabel: string; 
+  status: 'uptodate' | 'available' | 'inprogress' 
+}> = ({ nodeIdx, blockLabel, status }) => {
+  const config = {
+    uptodate: {
+      color: 'bg-blue-300',
+      textColor: 'text-blue-600',
+      label: 'UP TO DATE',
+      driver: 'v535.154.05',
+      gce: 'v20240214',
+      action: 'None needed'
+    },
+    available: {
+      color: 'bg-amber-400',
+      textColor: 'text-amber-600',
+      label: 'UPDATE AVAILABLE',
+      driver: 'v535.129.03',
+      nextDriver: 'v535.154.05',
+      gce: 'v20240110',
+      nextGce: 'v20240214',
+      action: <button className="text-[10px] font-bold text-[#1967D2] hover:underline">Schedule update</button>
+    },
+    inprogress: {
+      color: 'bg-pink-400',
+      textColor: 'text-pink-600',
+      label: 'UPDATING',
+      driver: 'v535.154.05 (Applying...)',
+      gce: 'v20240214 (Applying...)',
+      action: <div className="flex items-center gap-1 text-pink-500 animate-pulse"><RefreshCw size={10} /> In progress</div>
+    }
+  }[status];
+
+  return (
+    <div className="col-span-full mt-4 bg-slate-50 border border-slate-200 rounded-lg p-4 animate-fadeIn">
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${config.color}`} />
+            Node {nodeIdx} Software Stack ({blockLabel})
+          </h4>
+          <p className="text-[10px] text-slate-500">Current firmware and orchestration versions</p>
+        </div>
+        <div className="bg-white px-2 py-1 rounded border border-slate-200 text-[10px] font-bold text-slate-500">
+          OS: Ubuntu 22.04 LTS
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div className="bg-white p-3 rounded border border-slate-200 shadow-sm">
+          <div className="text-[9px] text-slate-400 uppercase font-bold mb-2">GPU Driver</div>
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-mono font-bold text-slate-700">{config.driver}</div>
+            {status === 'available' && (
+              <div className="flex items-center gap-1 text-[10px] text-blue-600 font-bold">
+                <SkipForward size={10} /> {config.nextDriver}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="bg-white p-3 rounded border border-slate-200 shadow-sm">
+          <div className="text-[9px] text-slate-400 uppercase font-bold mb-2">GCE Software</div>
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-mono font-bold text-slate-700">{config.gce}</div>
+            {status === 'available' && (
+              <div className="flex items-center gap-1 text-[10px] text-blue-600 font-bold">
+                <SkipForward size={10} /> {config.nextGce}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-white p-2 rounded border border-slate-200">
+          <div className="text-[9px] text-slate-400 uppercase font-bold">Status</div>
+          <div className={`text-xs font-bold ${config.textColor}`}>{config.label}</div>
+        </div>
+        <div className="bg-white p-2 rounded border border-slate-200">
+          <div className="text-[9px] text-slate-400 uppercase font-bold">Last Reboot</div>
+          <div className="text-xs font-bold text-slate-700">12 days ago</div>
+        </div>
+        <div className="bg-white p-2 rounded border border-slate-200">
+          <div className="text-[9px] text-slate-400 uppercase font-bold">Action</div>
+          <div className="text-[10px] font-bold text-slate-500">{config.action}</div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const ClusterDetail: React.FC<ClusterDetailProps> = ({ clusterId, onBack }) => {
+  const [viewMode, setViewMode] = useState<'HEALTH' | 'UTILIZATION' | 'MAINTENANCE'>('HEALTH');
   const [superBlocks, setSuperBlocks] = useState(MOCK_SUPER_BLOCKS);
   const [selectedNode, setSelectedNode] = useState<{
     sbId: string, 
     bId: string, 
     idx: number,
-    status: 'healthy' | 'degraded' | 'unhealthy'
+    status: any
   } | null>(() => {
     // Auto-select first unhealthy node if navigating from a warning cluster
     const sb1 = MOCK_SUPER_BLOCKS[0];
@@ -279,6 +372,11 @@ export const ClusterDetail: React.FC<ClusterDetailProps> = ({ clusterId, onBack 
     }
     return null;
   });
+
+  const handleTabChange = (mode: 'HEALTH' | 'UTILIZATION' | 'MAINTENANCE') => {
+    setViewMode(mode);
+    setSelectedNode(null);
+  };
 
   const region = REGIONS.find(r => r.clusters.some(c => c.id === clusterId));
   const foundCluster = region?.clusters.find(c => c.id === clusterId);
@@ -331,13 +429,22 @@ export const ClusterDetail: React.FC<ClusterDetailProps> = ({ clusterId, onBack 
             
             {/* Action Buttons */}
             <div className="flex gap-2">
-                <button className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1967D2]/10 text-[#1967D2] rounded text-[10px] font-bold hover:bg-[#1967D2]/20 transition-colors uppercase tracking-wide">
+                <button 
+                  onClick={() => handleTabChange('HEALTH')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-bold transition-colors uppercase tracking-wide ${viewMode === 'HEALTH' ? 'bg-[#1967D2]/10 text-[#1967D2]' : 'bg-white border border-[#1967D2]/20 text-[#1967D2] hover:bg-slate-50'}`}
+                >
                     <CheckCircle2 size={12} /> Health
                 </button>
-                <button className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#1967D2]/20 text-[#1967D2] rounded text-[10px] font-bold hover:bg-slate-50 transition-colors uppercase tracking-wide">
+                <button 
+                  onClick={() => handleTabChange('UTILIZATION')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-bold transition-colors uppercase tracking-wide ${viewMode === 'UTILIZATION' ? 'bg-[#1967D2]/10 text-[#1967D2]' : 'bg-white border border-[#1967D2]/20 text-[#1967D2] hover:bg-slate-50'}`}
+                >
                     <AlertOctagon size={12} /> Utilization
                 </button>
-                <button className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#1967D2]/20 text-[#1967D2] rounded text-[10px] font-bold hover:bg-slate-50 transition-colors uppercase tracking-wide">
+                <button 
+                  onClick={() => handleTabChange('MAINTENANCE')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-bold transition-colors uppercase tracking-wide ${viewMode === 'MAINTENANCE' ? 'bg-[#1967D2]/10 text-[#1967D2]' : 'bg-white border border-[#1967D2]/20 text-[#1967D2] hover:bg-slate-50'}`}
+                >
                     <RefreshCw size={12} /> Maintenance
                 </button>
             </div>
@@ -504,9 +611,18 @@ export const ClusterDetail: React.FC<ClusterDetailProps> = ({ clusterId, onBack 
                             <div className="flex flex-wrap gap-1">
                                 {block.nodes.map((status, idx) => {
                                     const isSelected = selectedNode?.sbId === sb.id && selectedNode?.bId === block.id && selectedNode?.idx === idx;
-                                    const mappedStatus: 'healthy' | 'degraded' | 'unhealthy' = 
-                                      status === 'unhealthy' ? 'unhealthy' :
-                                      status === 'suspected' ? 'degraded' : 'healthy';
+                                    
+                                    let mappedStatus: any;
+                                    if (viewMode === 'HEALTH') {
+                                      mappedStatus = status === 'unhealthy' ? 'unhealthy' :
+                                                     status === 'suspected' ? 'degraded' : 'healthy';
+                                    } else if (viewMode === 'MAINTENANCE') {
+                                      // Mock maintenance status based on health status for demo
+                                      mappedStatus = status === 'unhealthy' ? 'inprogress' :
+                                                     status === 'suspected' ? 'available' : 'uptodate';
+                                    } else {
+                                      mappedStatus = 'healthy';
+                                    }
 
                                     return (
                                         <div 
@@ -517,9 +633,16 @@ export const ClusterDetail: React.FC<ClusterDetailProps> = ({ clusterId, onBack 
                                           }}
                                           className={`
                                             w-8 h-6 rounded-[2px] cursor-pointer transition-all relative
-                                            ${status === 'healthy' ? 'bg-cyan-300 hover:bg-cyan-400' : ''}
-                                            ${status === 'suspected' ? 'bg-amber-400 hover:bg-amber-500' : ''}
-                                            ${status === 'unhealthy' ? 'bg-rose-500 hover:bg-rose-600' : ''}
+                                            ${viewMode === 'HEALTH' ? (
+                                              status === 'healthy' ? 'bg-cyan-300 hover:bg-cyan-400' :
+                                              status === 'suspected' ? 'bg-amber-400 hover:bg-amber-500' :
+                                              'bg-rose-500 hover:bg-rose-600'
+                                            ) : (
+                                              // Maintenance colors
+                                              status === 'healthy' ? 'bg-blue-300 hover:bg-blue-400' :
+                                              status === 'suspected' ? 'bg-amber-400 hover:bg-amber-500' :
+                                              'bg-pink-400 hover:bg-pink-500'
+                                            )}
                                             ${isSelected ? 'ring-2 ring-offset-1 ring-[#1967D2] z-20 scale-110' : 'z-0'}
                                           `}
                                           title={`Node ${idx} (${status})`}
@@ -532,8 +655,17 @@ export const ClusterDetail: React.FC<ClusterDetailProps> = ({ clusterId, onBack 
                     ))}
 
                     {/* Inline Health Detail */}
-                    {selectedNode && selectedNode.sbId === sb.id && (
+                    {selectedNode && selectedNode.sbId === sb.id && viewMode === 'HEALTH' && (
                       <NodeHealthDetail 
+                        nodeIdx={selectedNode.idx} 
+                        blockLabel={sb.blocks.find(b => b.id === selectedNode.bId)?.label || ''} 
+                        status={selectedNode.status}
+                      />
+                    )}
+
+                    {/* Inline Maintenance Detail */}
+                    {selectedNode && selectedNode.sbId === sb.id && viewMode === 'MAINTENANCE' && (
+                      <NodeMaintenanceDetail 
                         nodeIdx={selectedNode.idx} 
                         blockLabel={sb.blocks.find(b => b.id === selectedNode.bId)?.label || ''} 
                         status={selectedNode.status}
