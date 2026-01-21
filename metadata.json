@@ -1,0 +1,5 @@
+{
+  "name": "Abhi\u0027s Fleet reliability demo",
+  "description": "A comprehensive Machine Learning Engineering dashboard for tracking job performance, diagnostics (XProf/Diagon++), interruptions, and GPU goodput metrics.",
+  "requestFramePermissions": []
+}
