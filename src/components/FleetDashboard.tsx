@@ -58,15 +58,6 @@ export const problematicReservations = [
   { id: 'res-2', name: 'EU-Central-1-Inference', type: 'On-Demand', issue: 'High Latency', impact: 'Medium', count: 8 },
 ];
 
-export const badNodeEvents = [
-  { id: 'node-gke-1', event: 'ECC Memory Error', severity: 'Critical', recoveryTime: '-', actions: ['Isolate', 'Reboot'] },
-  { id: 'node-slurm-5', event: 'Network Partition', severity: 'Warning', recoveryTime: '5m', actions: ['View logs'] },
-  { id: 'node-tpu-v5-08', event: 'Power Supply Failure', severity: 'Critical', recoveryTime: '-', actions: ['Investigate'] },
-  { id: 'node-gke-4', event: 'Thermal Throttling', severity: 'Warning', recoveryTime: '15m', actions: ['View logs', 'Reboot'] },
-  { id: 'node-slurm-12', event: 'GPU Memory Error (ECC)', severity: 'Critical', recoveryTime: '-', actions: ['Investigate', 'Reboot'] },
-  { id: 'node-tpu-v4-01', event: 'ICI Link Flap', severity: 'Warning', recoveryTime: '2m', actions: ['View logs'] },
-];
-
 // Base trend data for 'All'
 const trendDataBase = [
 // ... (rest of file)
@@ -507,89 +498,6 @@ export const ProjectAcceleratorsTable: React.FC<ProjectAcceleratorsTableProps> =
   );
 };
 
-const BadNodeEventsTable: React.FC = () => {
-  const table = useTable<any>({
-    initialData: badNodeEvents,
-    initialSortColumn: 'severity',
-  });
-  return (
-    <div>
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-xs">
-        <thead className="bg-slate-50 border-b border-slate-200">
-          <tr>
-            <TableHeader
-  label="Node ID"
-  sortable={true}
-  sorted={table.sortColumn === 'id'}
-  ascending={table.sortDirection === 'asc'}
-  onClick={() => table.handleSort('id')}
-/>
-            <TableHeader
-  label="Event"
-  sortable={true}
-  sorted={table.sortColumn === 'event'}
-  ascending={table.sortDirection === 'asc'}
-  onClick={() => table.handleSort('event')}
-/>
-            <TableHeader
-  label="Severity"
-  sortable={true}
-  sorted={table.sortColumn === 'severity'}
-  ascending={table.sortDirection === 'asc'}
-  onClick={() => table.handleSort('severity')}
-/>
-            <TableHeader
-  label="Recovery time"
-  sortable={true}
-  sorted={table.sortColumn === 'recoveryTime'}
-  ascending={table.sortDirection === 'asc'}
-  onClick={() => table.handleSort('recoveryTime')}
-/>
-            <TableHeader label="Actions" />
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-200">
-          {table.paginatedData.map((event, i) => (
-            <tr key={i} className="hover:bg-slate-50 transition-colors">
-              <td className="px-4 py-2 font-medium text-slate-900 font-mono text-[11px]">{event.id}</td>
-              <td className="px-4 py-2 text-slate-600">{event.event}</td>
-              <td className="px-4 py-2">
-                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${
-                  event.severity === 'Critical' 
-                    ? 'bg-rose-50 text-rose-700 border-rose-200' 
-                    : 'bg-amber-50 text-amber-700 border-amber-200'
-                }`}>
-                  {event.severity}
-                </span>
-              </td>
-              <td className="px-4 py-2 text-slate-600">{event.recoveryTime}</td>
-              <td className="px-4 py-2">
-                <div className="flex gap-2">
-                  {event.actions.map((action, idx) => (
-                    <button 
-                      key={idx}
-                      className="text-[10px] text-[#1967D2] hover:underline font-medium"
-                    >
-                      {action}
-                    </button>
-                  ))}
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-    <Pagination
-      currentPage={table.currentPage}
-      totalPages={table.totalPages}
-      onPageChange={table.goToPage}
-    />
-    </div>
-  );
-};
-
 interface FleetDashboardProps {
   onNavigateToJobs: (jobId?: string) => void;
   investigateRequest: { type: string; ts: number } | null;
@@ -743,7 +651,7 @@ export const FleetDashboard: React.FC<FleetDashboardProps> = ({
           </Card>
        </div>
 
-       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+       <div className="grid grid-cols-1 gap-4">
           {/* Detailed Breakdown */}
           {filters.accelerator !== 'GPUs' && (
             <Card title="Fleet Utilization">
@@ -755,14 +663,6 @@ export const FleetDashboard: React.FC<FleetDashboardProps> = ({
               />
             </Card>
           )}
-
-          {/* Bad Node Events */}
-          {filters.accelerator !== 'TPUs' && (
-            <Card title="Bad node events">
-               <BadNodeEventsTable />
-            </Card>
-          )}
-          
        </div>
     </div>
   );

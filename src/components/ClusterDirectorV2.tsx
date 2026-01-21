@@ -340,7 +340,7 @@ const NodeMaintenanceDetail: React.FC<{
           <div className={`text-xs font-bold ${config.textColor}`}>{config.label}</div>
         </div>
         <div className="bg-white p-2 rounded border border-slate-200">
-          <div className="text-[9px] text-slate-400 uppercase font-bold">Last Reboot</div>
+          <div className="text-[9px] text-slate-400 uppercase font-bold">Last updated</div>
           <div className="text-xs font-bold text-slate-700">12 days ago</div>
         </div>
         <div className="bg-white p-2 rounded border border-slate-200">

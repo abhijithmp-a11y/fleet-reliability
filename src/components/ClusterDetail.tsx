@@ -12,7 +12,9 @@ import {
   ChevronRight, 
   RotateCw, 
   SkipForward, 
-  Search
+  Search,
+  TrendingUp,
+  Plus
 } from 'lucide-react';
 import { 
   PieChart, 
@@ -38,18 +40,36 @@ interface ClusterDetailProps {
   onNavigateToJobs?: (status?: JobStatus) => void;
 }
 
-// Visual constants matching the provided image
 const COLORS = {
-  healthy: '#67e8f9', // Cyan-300 (Visual match)
-  suspected: '#fbbf24', // Amber-400
-  unhealthy: '#f43f5e', // Rose-500
-  bg: '#f8fafc'
+  health: {
+    healthy: '#67e8f9', // Cyan-300
+    suspected: '#fbbf24', // Amber-400
+    unhealthy: '#f43f5e', // Rose-500
+  },
+  utilization: {
+    low: '#93c5fd', // Blue-300
+    med: '#60a5fa', // Blue-400
+    high: '#3b82f6', // Blue-500
+    reserved: '#e2e8f0', // Slate-200
+    straggler: '#f97316', // Orange-500
+  },
+  maintenance: {
+    uptodate: '#93c5fd', // Blue-300
+    available: '#fbbf24', // Amber-400
+    inprogress: '#f472b6', // Pink-400
+  }
 };
 
 const HEALTH_DATA = [
-  { name: 'Healthy', value: 414, color: COLORS.healthy },
-  { name: 'Suspected', value: 13, color: COLORS.suspected },
-  { name: 'Unhealthy', value: 3, color: COLORS.unhealthy },
+  { name: 'Healthy', value: 414, color: COLORS.health.healthy },
+  { name: 'Suspected', value: 13, color: COLORS.health.suspected },
+  { name: 'Unhealthy', value: 3, color: COLORS.health.unhealthy },
+];
+
+const MAINT_DATA = [
+  { name: 'Up-to-date', value: 247, color: COLORS.maintenance.uptodate },
+  { name: 'Available', value: 150, color: COLORS.maintenance.available },
+  { name: 'In Progress', value: 33, color: COLORS.maintenance.inprogress },
 ];
 
 const MOCK_SUPER_BLOCKS = [
@@ -119,6 +139,11 @@ const NODE_HEALTH_HISTORY = [
   { time: '10:00', temp: 82, util: 40 }, // Performance drop
   { time: '10:15', temp: 75, util: 10 }, // XID error
   { time: '10:30', temp: 65, util: 0 },
+];
+
+const UTIL_DATA = [
+  { name: 'Used', value: 510, color: '#a855f7' },
+  { name: 'Free', value: 120, color: '#e2e8f0' },
 ];
 
 const NodeHealthDetail: React.FC<{ 
@@ -342,7 +367,7 @@ const NodeMaintenanceDetail: React.FC<{
           <div className={`text-xs font-bold ${config.textColor}`}>{config.label}</div>
         </div>
         <div className="bg-white p-2 rounded border border-slate-200">
-          <div className="text-[9px] text-slate-400 uppercase font-bold">Last Reboot</div>
+          <div className="text-[9px] text-slate-400 uppercase font-bold">Last updated</div>
           <div className="text-xs font-bold text-slate-700">12 days ago</div>
         </div>
         <div className="bg-white p-2 rounded border border-slate-200">
@@ -389,6 +414,245 @@ export const ClusterDetail: React.FC<ClusterDetailProps> = ({ clusterId, onBack 
     setSuperBlocks(prev => prev.map(sb => sb.id === id ? { ...sb, isOpen: !sb.isOpen } : sb));
   };
 
+  const getNodeColor = (sbIdx: number, blockIdx: number, nodeIdx: number, mode: 'HEALTH' | 'UTILIZATION' | 'MAINTENANCE') => {
+    // Deterministic mock pattern matching ClusterDirectorV2
+    const key = (sbIdx * 32) + (blockIdx * 16) + nodeIdx;
+    
+    if (mode === 'HEALTH') {
+      if (key === 15) return COLORS.health.unhealthy;
+      if (key > 16 && key < 20) return COLORS.health.suspected;
+      if (key === 42) return COLORS.health.unhealthy;
+      if (key === 60) return COLORS.health.suspected;
+      return COLORS.health.healthy;
+    }
+
+    if (mode === 'UTILIZATION') {
+      if (key === 21) return COLORS.utilization.straggler;
+      if (key === 45) return COLORS.utilization.straggler;
+      if (key % 3 === 0) return COLORS.utilization.low;
+      if (key % 3 === 1) return COLORS.utilization.med;
+      return COLORS.utilization.high;
+    }
+
+    if (mode === 'MAINTENANCE') {
+      if (key > 5 && key < 10) return COLORS.maintenance.inprogress;
+      if (key > 16 && key < 24) return COLORS.maintenance.available;
+      return COLORS.maintenance.uptodate;
+    }
+    
+    return '#e2e8f0';
+  };
+
+  const renderDashboardCard = () => {
+    switch (viewMode) {
+      case 'HEALTH':
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 p-4">
+            {/* Donut Chart */}
+            <div className="relative w-32 h-32 shrink-0 mx-auto lg:mx-0">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                    <PieChart>
+                        <Pie
+                            data={HEALTH_DATA}
+                            innerRadius={45}
+                            outerRadius={55}
+                            paddingAngle={2}
+                            dataKey="value"
+                            startAngle={90}
+                            endAngle={-270}
+                            stroke="none"
+                        >
+                            {HEALTH_DATA.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                        </Pie>
+                    </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-2xl font-bold text-slate-700">430</span>
+                    <span className="text-[9px] text-slate-400 uppercase font-bold">Total VMs</span>
+                </div>
+            </div>
+
+            {/* Health Details Columns */}
+            <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Column 1: Status Legend */}
+                <div className="space-y-2">
+                    <h4 className="font-bold text-slate-800 text-xs">Health check status</h4>
+                    <div className="space-y-1.5 text-xs text-slate-600">
+                        <div className="flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-cyan-300"></div>
+                            <span>Healthy: <strong className="text-[#1967D2]">414 VMs</strong></span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-amber-400"></div>
+                            <span>Suspected: <strong className="text-[#1967D2]">13 VMs</strong></span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-rose-500"></div>
+                            <span>Unhealthy: <strong className="text-[#1967D2]">3 VMs</strong></span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Column 2: Unhealthy/Suspected Summary */}
+                <div className="space-y-4">
+                     <div>
+                        <h4 className="font-bold text-slate-800 text-xs mb-1">Unhealthy nodes</h4>
+                        <div className="flex items-center gap-1.5 text-rose-600 font-bold text-base">
+                             <AlertOctagon size={16} /> 3 / 430 VMs
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">Last check 02/14/2025</div>
+                        <button className="text-[#1967D2] text-[10px] font-bold hover:underline">Replace all bad nodes</button>
+                     </div>
+                     <div>
+                        <h4 className="font-bold text-slate-800 text-xs mb-1">Suspected nodes</h4>
+                        <div className="flex items-center gap-1.5 text-amber-500 font-bold text-base">
+                             <AlertTriangle size={16} /> 13 / 430 VMs
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">Based on AI Health Predictor</div>
+                        <button className="text-[#1967D2] text-[10px] font-bold hover:underline">Rerun health check</button>
+                     </div>
+                </div>
+
+                {/* Column 3: Latest Checks History */}
+                <div>
+                    <h4 className="font-bold text-slate-800 text-xs mb-2">Latest health checks</h4>
+                    <ul className="space-y-1.5 text-[10px] text-slate-600">
+                        <li className="flex items-center gap-2">
+                            <div className="w-1 h-1 rounded-full bg-slate-400"></div>
+                            12/10/24: <span className="text-[#1967D2]">94 VMs</span>
+                        </li>
+                         <li className="flex items-center gap-2">
+                            <div className="w-1 h-1 rounded-full bg-slate-400"></div>
+                            11/10/24: <span className="text-[#1967D2]">73 VMs</span>
+                        </li>
+                         <li className="flex items-center gap-2">
+                            <div className="w-1 h-1 rounded-full bg-slate-400"></div>
+                            09/10/24: <span className="text-[#1967D2]">41 VMs</span>
+                        </li>
+                    </ul>
+                    <button className="text-[#1967D2] text-[10px] font-bold hover:underline mt-1">See all</button>
+                </div>
+            </div>
+          </div>
+        );
+      case 'MAINTENANCE':
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 p-4">
+            {/* Donut Chart */}
+            <div className="relative w-32 h-32 shrink-0 mx-auto lg:mx-0">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                    <PieChart>
+                        <Pie
+                            data={MAINT_DATA}
+                            innerRadius={45}
+                            outerRadius={55}
+                            paddingAngle={2}
+                            dataKey="value"
+                            startAngle={90}
+                            endAngle={-270}
+                            stroke="none"
+                        >
+                            {MAINT_DATA.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                        </Pie>
+                    </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-2xl font-bold text-slate-700">430</span>
+                    <span className="text-[9px] text-slate-400 uppercase font-bold">Total VMs</span>
+                </div>
+            </div>
+
+            {/* Maintenance Details Columns */}
+            <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                    <h4 className="font-bold text-slate-800 text-xs">Maintenance status</h4>
+                    <div className="space-y-1.5 text-[11px] text-slate-600">
+                      <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-blue-300"/> Up-to-date: <span className="text-[#1967D2]">247 VMs</span></div>
+                      <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-amber-400"/> Update available: <span className="text-[#1967D2]">150 VMs</span></div>
+                      <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-pink-400"/> In progress: <span className="text-[#1967D2]">33 VMs</span></div>
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="font-bold text-slate-800 text-xs">Upcoming impact:</h4>
+                  <ul className="space-y-1.5 text-[10px] text-slate-600">
+                      <li><span className="text-purple-600 font-bold">•</span> Next 5 days: <span className="text-[#1967D2]">78 VMs</span></li>
+                      <li><span className="text-purple-400 font-bold">•</span> In a week: <span className="text-[#1967D2]">56 VMs</span></li>
+                      <li><span className="text-blue-500 font-bold">•</span> In a month: <span className="text-[#1967D2]">216 VMs</span></li>
+                  </ul>
+                  <p className="text-[9px] text-slate-500 leading-tight">Start partially now to avoid disruption.</p>
+                  <button className="text-[#1967D2] text-[10px] font-bold hover:underline">Learn more</button>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="font-bold text-slate-800 text-xs">Unplanned maintenance <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block ml-0.5"></span></h4>
+                  <div className="flex items-center gap-1.5 text-slate-700 font-bold text-base"><AlertOctagon size={16} className="fill-red-500 text-white" /> 4 / 430 VMs</div>
+                  <p className="text-[9px] text-slate-500 leading-tight">Start 02/14/2025 at 12:00 UTC. Add temporary capacity to keep jobs running.</p>
+                  <button className="text-[#1967D2] text-[10px] font-bold hover:underline">Start maintenance now</button>
+                </div>
+            </div>
+          </div>
+        );
+      case 'UTILIZATION':
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 p-4">
+             <div className="space-y-3">
+               <h4 className="font-bold text-slate-800 text-xs">Reserved capacity</h4>
+               <div className="flex items-center gap-1.5 text-slate-700 font-bold text-base"><AlertTriangle size={16} className="text-amber-500" /> 38 / 430 VMs</div>
+               <p className="text-[10px] text-slate-500 leading-tight">You have unused reserved capacity. Start using these VMs to use it fully.</p>
+               <button className="text-[#1967D2] text-[10px] font-bold hover:underline">See reservations</button>
+             </div>
+
+             <div className="space-y-3">
+               <h4 className="font-bold text-slate-800 text-xs">Newly added jobs</h4>
+               <div className="text-[10px] space-y-1 text-slate-600">
+                  <div className="flex justify-between"><span>Job-name-7</span> <span className="text-[#1967D2]">34 VMs</span></div>
+                  <div className="flex justify-between"><span>Job-name-8</span> <span className="text-[#1967D2]">28 VMs</span></div>
+                  <div className="flex justify-between"><span>Job-name-9</span> <span className="text-[#1967D2]">13 VMs</span></div>
+               </div>
+               <button className="text-[#1967D2] text-[10px] font-bold hover:underline">See cluster trends</button>
+             </div>
+
+             <div className="relative w-28 h-28 shrink-0 mx-auto">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                    <PieChart>
+                        <Pie
+                            data={UTIL_DATA}
+                            innerRadius={40}
+                            outerRadius={50}
+                            paddingAngle={2}
+                            dataKey="value"
+                            startAngle={90}
+                            endAngle={-270}
+                            stroke="none"
+                        >
+                            {UTIL_DATA.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                        </Pie>
+                    </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-xl font-bold text-slate-700">510</span>
+                    <span className="text-[9px] text-slate-400 uppercase font-bold">Total Jobs</span>
+                </div>
+            </div>
+
+                <div className="space-y-3">
+                  <h4 className="font-bold text-slate-800 text-xs">Straggler detection <span className="w-1.5 h-1.5 rounded-full bg-orange-500 inline-block ml-0.5"></span></h4>
+                  <div className="flex items-center gap-1.5 text-slate-700 font-bold text-base"><TrendingUp size={16} className="text-orange-500" /> 5 / 430 VMs</div>
+                  <p className="text-[10px] text-slate-500 leading-tight">Use checkpointing to replace nodes and keep jobs running.</p>
+                  <button className="text-[#1967D2] text-[10px] font-bold hover:underline">Learn more</button>
+                </div>
+          </div>
+        );
+    }
+  };
+
   return (
     <div className="space-y-4 animate-fadeIn font-sans text-slate-900 text-xs">
       {/* Breadcrumb / Header */}
@@ -402,9 +666,9 @@ export const ClusterDetail: React.FC<ClusterDetailProps> = ({ clusterId, onBack 
       </div>
 
       {/* Health Summary Card */}
-      <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
+      <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
         {/* Top Controls */}
-        <div className="flex flex-col md:flex-row gap-4 justify-between mb-4 border-b border-slate-100 pb-4">
+        <div className="flex flex-col md:flex-row gap-4 justify-between mb-4 border-b border-slate-100 p-4">
             {/* Filter Controls */}
             <div className="flex gap-3 items-center">
                 <div className="relative">
@@ -451,110 +715,59 @@ export const ClusterDetail: React.FC<ClusterDetailProps> = ({ clusterId, onBack 
         </div>
 
         {/* Dashboard Metrics */}
-        <div className="flex flex-col lg:flex-row gap-6 items-center lg:items-start">
-            {/* Donut Chart */}
-            <div className="relative w-32 h-32 shrink-0">
-                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                    <PieChart>
-                        <Pie
-                            data={HEALTH_DATA}
-                            innerRadius={45}
-                            outerRadius={55}
-                            paddingAngle={2}
-                            dataKey="value"
-                            startAngle={90}
-                            endAngle={-270}
-                            stroke="none"
-                        >
-                            {HEALTH_DATA.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                        </Pie>
-                    </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                    <span className="text-3xl font-bold text-slate-700">430</span>
-                    <span className="text-[10px] text-slate-400 font-medium">Total VMs</span>
-                </div>
-            </div>
-
-            {/* Health Details Columns */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1 w-full">
-                {/* Column 1: Status Legend */}
-                <div className="space-y-2">
-                    <h4 className="font-bold text-slate-800 text-xs">Health check status</h4>
-                    <div className="space-y-1.5">
-                        <div className="flex items-center gap-2 text-xs text-slate-600">
-                            <div className="w-2 h-2 rounded-full bg-cyan-300"></div>
-                            <span>Healthy: <strong className="text-slate-800">414 VMs</strong></span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-slate-600">
-                            <div className="w-2 h-2 rounded-full bg-amber-400"></div>
-                            <span>Suspected: <strong className="text-slate-800">13 VMs</strong></span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-slate-600">
-                            <div className="w-2 h-2 rounded-full bg-rose-500"></div>
-                            <span>Unhealthy: <strong className="text-slate-800">3 VMs</strong></span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Column 2: Unhealthy/Suspected Summary */}
-                <div className="space-y-4">
-                     <div>
-                        <h4 className="font-bold text-slate-800 text-xs mb-1">Unhealthy nodes</h4>
-                        <div className="flex items-center gap-1.5 text-rose-600 font-bold text-base">
-                             <AlertOctagon size={16} /> 3 / 430 VMs
-                        </div>
-                        <div className="text-[10px] text-slate-500 mt-0.5">Last check 02/14/2025 at 12:00:00 UTC</div>
-                        <button className="text-[#1967D2] text-[10px] font-bold hover:underline mt-0.5">Replace all bad nodes</button>
-                     </div>
-                     <div>
-                        <h4 className="font-bold text-slate-800 text-xs mb-1">Suspected nodes</h4>
-                        <div className="flex items-center gap-1.5 text-amber-500 font-bold text-base">
-                             <AlertTriangle size={16} /> 13 / 430 VMs
-                        </div>
-                        <div className="text-[10px] text-slate-500 mt-0.5">Based on HCC's <span className="text-[#1967D2] cursor-pointer">AI health predictor</span></div>
-                        <button className="text-[#1967D2] text-[10px] font-bold hover:underline mt-0.5">Rerun health check</button>
-                     </div>
-                </div>
-
-                {/* Column 3: Latest Checks History */}
-                <div>
-                    <h4 className="font-bold text-slate-800 text-xs mb-2">Latest health checks</h4>
-                    <ul className="space-y-1.5 text-xs text-slate-600">
-                        <li className="flex items-center gap-2">
-                            <div className="w-1 h-1 rounded-full bg-slate-400"></div>
-                            12/10/24 at 12:00:00 UTC: <span className="text-[#1967D2] font-medium">94 VMs</span>
-                        </li>
-                         <li className="flex items-center gap-2">
-                            <div className="w-1 h-1 rounded-full bg-slate-400"></div>
-                            11/10/24 at 12:00:00 UTC: <span className="text-[#1967D2] font-medium">73 VMs</span>
-                        </li>
-                         <li className="flex items-center gap-2">
-                            <div className="w-1 h-1 rounded-full bg-slate-400"></div>
-                            09/10/24 at 12:00:00 UTC: <span className="text-[#1967D2] font-medium">41 VMs</span>
-                        </li>
-                    </ul>
-                    <button className="text-[#1967D2] text-[10px] font-bold hover:underline mt-2 ml-3">See all</button>
-                </div>
-            </div>
-        </div>
+        {renderDashboardCard()}
 
         {/* Bottom Legend Bar */}
         <div className="mt-6 pt-3 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
              <div className="flex gap-4 text-[10px] font-medium">
-                 <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-cyan-300"></div> Healthy</div>
-                 <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-400"></div> Suspected bad node</div>
-                 <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-rose-500"></div> Unhealthy</div>
+                 {viewMode === 'HEALTH' && (
+                    <>
+                      <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-cyan-300"></div> Healthy</div>
+                      <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-400"></div> Suspected bad node</div>
+                      <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-rose-500"></div> Unhealthy</div>
+                    </>
+                 )}
+                 {viewMode === 'UTILIZATION' && (
+                    <>
+                      <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-300"/> 0%-40%</div>
+                      <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-400"/> 40%-80%</div>
+                      <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500"/> 80%-100%</div>
+                    </>
+                 )}
+                 {viewMode === 'MAINTENANCE' && (
+                    <>
+                      <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-300"/> Up-to-date</div>
+                      <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-amber-400"/> Update available</div>
+                      <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-pink-400"/> In progress</div>
+                    </>
+                 )}
              </div>
              <div className="flex gap-4">
-                 <button className="flex items-center gap-1 text-[#1967D2] text-xs font-medium hover:text-[#1557B0]">
-                    <Play size={14} className="fill-[#1967D2]" /> Rerun all health checks
-                 </button>
-                 <button className="flex items-center gap-1 text-[#1967D2] text-xs font-medium hover:text-[#1557B0]">
-                    <SkipForward size={14} className="fill-[#1967D2]" /> Replace all bad nodes
-                 </button>
+                 {viewMode === 'HEALTH' && (
+                   <>
+                     <button className="flex items-center gap-1 text-[#1967D2] text-xs font-medium hover:text-[#1557B0]">
+                        <Play size={14} className="fill-[#1967D2]" /> Rerun all health checks
+                     </button>
+                     <button className="flex items-center gap-1 text-[#1967D2] text-xs font-medium hover:text-[#1557B0]">
+                        <SkipForward size={14} className="fill-[#1967D2]" /> Replace all bad nodes
+                     </button>
+                   </>
+                 )}
+                 {viewMode === 'UTILIZATION' && (
+                   <>
+                     <button className="flex items-center gap-1 text-[#1967D2] text-xs font-medium hover:text-[#1557B0]">
+                        <Plus size={14} /> Add capacity
+                     </button>
+                     <button className="flex items-center gap-1 text-[#1967D2] text-xs font-medium hover:text-[#1557B0]">
+                        <SkipForward size={14} className="fill-[#1967D2]" /> Replace stragglers
+                     </button>
+                   </>
+                 )}
+                 {viewMode === 'MAINTENANCE' && (
+                   <button className="flex items-center gap-1 text-[#1967D2] text-xs font-medium hover:text-[#1557B0]">
+                      <Play size={14} className="fill-[#1967D2]" /> Start all maintenance now
+                   </button>
+                 )}
              </div>
         </div>
       </div>
@@ -569,7 +782,7 @@ export const ClusterDetail: React.FC<ClusterDetailProps> = ({ clusterId, onBack 
                  className={`px-4 py-3 flex justify-between items-center cursor-pointer hover:bg-slate-50 select-none rounded-t-lg ${!sb.isOpen ? 'rounded-b-lg' : ''}`}
                >
                   <div className="flex items-center gap-2">
-                     <h3 className="text-base font-medium text-slate-900">{sb.title}</h3>
+                     <h3 className="text-sm font-medium text-slate-900">{sb.title}</h3>
                      <ChevronDown size={16} className={`text-slate-400 transition-transform ${sb.isOpen ? 'rotate-180' : ''}`} />
                   </div>
                   
@@ -587,10 +800,21 @@ export const ClusterDetail: React.FC<ClusterDetailProps> = ({ clusterId, onBack 
                                 Suspected: {sb.suspectedCount} VMs
                             </div>
                         )}
-                         <div className="flex gap-3 text-[#1967D2] ml-3">
-                            <span className="flex items-center gap-1 cursor-pointer hover:underline"><Play size={10} className="fill-[#1967D2]" /> Start health check</span>
-                            <span className="flex items-center gap-1 cursor-pointer hover:underline"><SkipForward size={10} className="fill-[#1967D2]" /> Replace bad nodes</span>
+                <div className="flex gap-2">
+                    {viewMode === 'HEALTH' && (
+                        <div className="flex items-center gap-1 text-[#1967D2] text-[10px] font-bold">
+                            <Play size={10} className="fill-[#1967D2]" /> Start health check
                         </div>
+                    )}
+                    {viewMode === 'MAINTENANCE' && (
+                        <div className="flex items-center gap-1 text-[#1967D2] text-[10px] font-bold">
+                            <Play size={10} className="fill-[#1967D2]" /> Start maintenance
+                        </div>
+                    )}
+                    <div className="flex items-center gap-1 text-[#1967D2] text-[10px] font-bold">
+                        <SkipForward size={10} className="fill-[#1967D2]" /> Replace {viewMode === 'UTILIZATION' ? 'stragglers' : 'bad nodes'}
+                    </div>
+                </div>
                      </div>
                   )}
                   {!sb.isOpen && (
@@ -608,18 +832,18 @@ export const ClusterDetail: React.FC<ClusterDetailProps> = ({ clusterId, onBack 
                     {sb.blocks.map(block => (
                         <div key={block.id}>
                             <h5 className="text-xs text-slate-500 mb-2">{block.label}</h5>
-                            <div className="flex flex-wrap gap-1">
-                                {block.nodes.map((status, idx) => {
+                             <div className="flex flex-wrap gap-1">
+                                {block.nodes.map((_, idx) => {
+                                    const color = getNodeColor(superBlocks.indexOf(sb), sb.blocks.indexOf(block), idx, viewMode);
                                     const isSelected = selectedNode?.sbId === sb.id && selectedNode?.bId === block.id && selectedNode?.idx === idx;
                                     
                                     let mappedStatus: any;
                                     if (viewMode === 'HEALTH') {
-                                      mappedStatus = status === 'unhealthy' ? 'unhealthy' :
-                                                     status === 'suspected' ? 'degraded' : 'healthy';
+                                      mappedStatus = color === COLORS.health.unhealthy ? 'unhealthy' :
+                                                     color === COLORS.health.suspected ? 'degraded' : 'healthy';
                                     } else if (viewMode === 'MAINTENANCE') {
-                                      // Mock maintenance status based on health status for demo
-                                      mappedStatus = status === 'unhealthy' ? 'inprogress' :
-                                                     status === 'suspected' ? 'available' : 'uptodate';
+                                      mappedStatus = color === COLORS.maintenance.inprogress ? 'inprogress' :
+                                                     color === COLORS.maintenance.available ? 'available' : 'uptodate';
                                     } else {
                                       mappedStatus = 'healthy';
                                     }
@@ -632,20 +856,11 @@ export const ClusterDetail: React.FC<ClusterDetailProps> = ({ clusterId, onBack 
                                             else setSelectedNode({ sbId: sb.id, bId: block.id, idx, status: mappedStatus });
                                           }}
                                           className={`
-                                            w-8 h-6 rounded-[2px] cursor-pointer transition-all relative
-                                            ${viewMode === 'HEALTH' ? (
-                                              status === 'healthy' ? 'bg-cyan-300 hover:bg-cyan-400' :
-                                              status === 'suspected' ? 'bg-amber-400 hover:bg-amber-500' :
-                                              'bg-rose-500 hover:bg-rose-600'
-                                            ) : (
-                                              // Maintenance colors
-                                              status === 'healthy' ? 'bg-blue-300 hover:bg-blue-400' :
-                                              status === 'suspected' ? 'bg-amber-400 hover:bg-amber-500' :
-                                              'bg-pink-400 hover:bg-pink-500'
-                                            )}
-                                            ${isSelected ? 'ring-2 ring-offset-1 ring-[#1967D2] z-20 scale-110' : 'z-0'}
+                                            w-6 h-5 rounded-[2px] cursor-pointer transition-all relative
+                                            ${isSelected ? 'ring-2 ring-offset-1 ring-slate-400 z-20 scale-110' : 'z-0 hover:opacity-80'}
                                           `}
-                                          title={`Node ${idx} (${status})`}
+                                          style={{ backgroundColor: color }}
+                                          title={`Node ${idx}`}
                                         >
                                         </div>
                                     );
