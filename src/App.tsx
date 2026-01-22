@@ -46,6 +46,7 @@ import { FleetDashboard, EfficiencyFunnelChart, problematicReservations, Project
 import { FleetEfficiencyDetail } from '@/components/FleetEfficiencyDetail';
 import { ClusterTopology, REGIONS } from '@/components/ClusterTopology';
 import { ClusterDirectorV2 } from '@/components/ClusterDirectorV2';
+import { ProjectTopology } from '@/components/ProjectTopology';
 import { ClusterDetail } from '@/components/ClusterDetail';
 import { ScenarioGuide, SCENARIOS } from '@/components/ScenarioGuide';
 import { JobDetail } from '@/components/WorkloadDetail';
@@ -1836,9 +1837,8 @@ export default function App() {
             {/* Health View */}
             {activeTab === 'health' && (
               <div className="flex flex-col animate-fadeIn space-y-4">
-                 <RainbowBanner />
                  <h1 className="text-xl font-bold text-slate-900">Bill of health</h1>
-                 <FilterBar filters={filters} setFilters={setFilters} />
+                 <ProjectTopology />
               </div>
             )}
             

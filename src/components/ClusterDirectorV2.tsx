@@ -58,8 +58,8 @@ const MOCK_BLOCKS = [
     label: 'Super block 1',
     isOpen: true,
     blocks: [
-      { id: 'b1', label: 'Block 1', nodes: Array(16).fill(0) },
-      { id: 'b2', label: 'Block 2', nodes: Array(16).fill(0) },
+      { id: 'b1', label: 'Block 1', nodes: Array(18).fill(0) },
+      { id: 'b2', label: 'Block 2', nodes: Array(18).fill(0) },
     ]
   },
   {
@@ -67,19 +67,28 @@ const MOCK_BLOCKS = [
     label: 'Super block 2',
     isOpen: false,
     extraLabel: 'Unhealthy: 1 VMs',
-    blocks: []
+    blocks: [
+      { id: 'b3', label: 'Block 1', nodes: Array(18).fill(0) },
+      { id: 'b4', label: 'Block 2', nodes: Array(18).fill(0) },
+    ]
   },
   {
     id: 'sb3',
     label: 'Super block 3',
     isOpen: false,
-    blocks: []
+    blocks: [
+      { id: 'b5', label: 'Block 1', nodes: Array(18).fill(0) },
+      { id: 'b6', label: 'Block 2', nodes: Array(18).fill(0) },
+    ]
   },
   {
     id: 'sb4',
     label: 'Super block 4',
     isOpen: false,
-    blocks: []
+    blocks: [
+      { id: 'b7', label: 'Block 1', nodes: Array(18).fill(0) },
+      { id: 'b8', label: 'Block 2', nodes: Array(18).fill(0) },
+    ]
   }
 ];
 
@@ -122,8 +131,9 @@ const NODE_HEALTH_HISTORY = [
 const NodeHealthDetail: React.FC<{ 
   nodeIdx: number; 
   blockLabel: string; 
-  status: 'healthy' | 'degraded' | 'unhealthy' 
-}> = ({ nodeIdx, blockLabel, status }) => {
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  hasVM: boolean;
+}> = ({ nodeIdx, blockLabel, status, hasVM }) => {
   const config = {
     healthy: {
       color: 'bg-cyan-300',
@@ -137,9 +147,13 @@ const NodeHealthDetail: React.FC<{
       color: 'bg-amber-400',
       textColor: 'text-amber-600',
       label: 'DEGRADED',
-      detailLabel: 'Straggler node',
-      detailValue: 'High Latency',
-      action: <button className="text-[10px] font-bold text-[#1967D2] hover:underline">Investigate metrics</button>
+      detailLabel: hasVM ? 'Straggler node' : 'Repairs/Unschedulable',
+      detailValue: hasVM ? 'High Latency' : 'Maintenance State',
+      action: hasVM ? (
+        <button className="text-[10px] font-bold text-[#1967D2] hover:underline">Investigate metrics</button>
+      ) : (
+        <button className="text-[10px] font-bold text-[#1967D2] hover:underline">Check logs</button>
+      )
     },
     unhealthy: {
       color: 'bg-rose-500',
@@ -147,7 +161,7 @@ const NodeHealthDetail: React.FC<{
       label: 'UNHEALTHY',
       detailLabel: 'Error Code',
       detailValue: 'XID 31 (Memory)',
-      action: <button className="text-[10px] font-bold text-[#1967D2] hover:underline">Drain & Replace</button>
+      action: <button className="text-[10px] font-bold text-[#1967D2] hover:underline">Report & Replace</button>
     }
   }[status];
 
@@ -159,88 +173,101 @@ const NodeHealthDetail: React.FC<{
             <div className={`w-2 h-2 rounded-full ${config.color}`} />
             Node {nodeIdx} Health Diagnostics ({blockLabel})
           </h4>
-          <p className="text-[10px] text-slate-500">Real-time telemetry and error markers</p>
+          <p className="text-[10px] text-slate-500">
+            {hasVM ? 'Real-time telemetry and error markers' : 'Node state and repair logs'}
+          </p>
         </div>
-        <div className="flex gap-2">
-           <div className="flex items-center gap-1 text-[10px] font-medium text-slate-600">
-              <div className="w-2 h-0.5 bg-rose-500" /> Temperature (°C)
-           </div>
-           <div className="flex items-center gap-1 text-[10px] font-medium text-slate-600">
-              <div className="w-2 h-0.5 bg-blue-500" /> Utilization (%)
-           </div>
-        </div>
+        {hasVM && (
+          <div className="flex gap-2">
+             <div className="flex items-center gap-1 text-[10px] font-medium text-slate-600">
+                <div className="w-2 h-0.5 bg-rose-500" /> Temperature (°C)
+             </div>
+             <div className="flex items-center gap-1 text-[10px] font-medium text-slate-600">
+                <div className="w-2 h-0.5 bg-blue-500" /> Utilization (%)
+             </div>
+          </div>
+        )}
       </div>
 
-      <div className="h-48 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={NODE_HEALTH_HISTORY} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-            <XAxis 
-              dataKey="time" 
-              fontSize={10} 
-              tickLine={false} 
-              axisLine={false} 
-              tick={{ fill: '#94a3b8' }}
-            />
-            <YAxis 
-              fontSize={10} 
-              tickLine={false} 
-              axisLine={false} 
-              tick={{ fill: '#94a3b8' }}
-            />
-            <Tooltip 
-              contentStyle={{ fontSize: '10px', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-            />
-            
-            {/* Markers */}
-            {status !== 'healthy' && (
-              <>
-                <ReferenceLine 
-                  x="09:45" 
-                  stroke="#f43f5e" 
-                  strokeDasharray="3 3"
-                  label={{ 
-                    value: 'Thermal Spike', 
-                    position: 'top', 
-                    fill: '#f43f5e', 
-                    fontSize: 10, 
-                    fontWeight: 'bold' 
-                  }} 
-                />
-                <ReferenceLine 
-                  x="10:15" 
-                  stroke="#e11d48" 
-                  strokeWidth={2}
-                  label={{ 
-                    value: 'XID Error', 
-                    position: 'top', 
-                    fill: '#e11d48', 
-                    fontSize: 10, 
-                    fontWeight: 'bold' 
-                  }} 
-                />
-              </>
-            )}
+      {hasVM ? (
+        <div className="h-48 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={NODE_HEALTH_HISTORY} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+              <XAxis 
+                dataKey="time" 
+                fontSize={10} 
+                tickLine={false} 
+                axisLine={false} 
+                tick={{ fill: '#94a3b8' }}
+              />
+              <YAxis 
+                fontSize={10} 
+                tickLine={false} 
+                axisLine={false} 
+                tick={{ fill: '#94a3b8' }}
+              />
+              <Tooltip 
+                contentStyle={{ fontSize: '10px', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+              />
+              
+              {/* Markers */}
+              {status !== 'healthy' && (
+                <>
+                  <ReferenceLine 
+                    x="09:45" 
+                    stroke="#f43f5e" 
+                    strokeDasharray="3 3"
+                    label={{ 
+                      value: 'Thermal Spike', 
+                      position: 'top', 
+                      fill: '#f43f5e', 
+                      fontSize: 10, 
+                      fontWeight: 'bold' 
+                    }} 
+                  />
+                  <ReferenceLine 
+                    x="10:15" 
+                    stroke="#e11d48" 
+                    strokeWidth={2}
+                    label={{ 
+                      value: 'XID Error', 
+                      position: 'top', 
+                      fill: '#e11d48', 
+                      fontSize: 10, 
+                      fontWeight: 'bold' 
+                    }} 
+                  />
+                </>
+              )}
 
-            <Line 
-              type="monotone" 
-              dataKey="temp" 
-              stroke="#f43f5e" 
-              strokeWidth={2} 
-              dot={{ r: 3, fill: '#f43f5e' }} 
-              activeDot={{ r: 5 }}
-            />
-            <Line 
-              type="monotone" 
-              dataKey="util" 
-              stroke="#3b82f6" 
-              strokeWidth={2} 
-              dot={{ r: 3, fill: '#3b82f6' }} 
-              activeDot={{ r: 5 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+              <Line 
+                type="monotone" 
+                dataKey="temp" 
+                stroke="#f43f5e" 
+                strokeWidth={2} 
+                dot={{ r: 3, fill: '#f43f5e' }} 
+                activeDot={{ r: 5 }}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="util" 
+                stroke="#3b82f6" 
+                strokeWidth={2} 
+                dot={{ r: 3, fill: '#3b82f6' }} 
+                activeDot={{ r: 5 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      ) : (
+        <div className="h-24 flex items-center justify-center bg-white border border-dashed border-slate-200 rounded mb-4">
+           <div className="text-center">
+              <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">No VM Active</div>
+              <p className="text-[10px] text-slate-400">Time series metrics are unavailable for empty nodes.</p>
+           </div>
+        </div>
+      )}
 
       <div className="mt-4 grid grid-cols-3 gap-4">
         <div className="bg-white p-2 rounded border border-slate-200">
@@ -360,12 +387,14 @@ export const ClusterDirectorV2: React.FC = () => {
     blockId: string; 
     nodeIdx: number;
     status: any;
+    hasVM: boolean;
   } | null>(() => {
     // Auto-select first unhealthy node in Super Block 1 for demo purposes
     const sb1 = MOCK_BLOCKS[0];
     const b1 = sb1.blocks[0];
+    const hasVM = (15 + 0 * 18) % 7 !== 0;
     // In getNodeColor, key 15 is unhealthy. blockIdx 0, nodeIdx 15 -> key 15.
-    return { sbId: sb1.id, blockId: b1.id, nodeIdx: 15, status: 'unhealthy' };
+    return { sbId: sb1.id, blockId: b1.id, nodeIdx: 15, status: 'unhealthy', hasVM };
   });
 
   const toggleSuperBlock = (id: string) => {
@@ -380,11 +409,11 @@ export const ClusterDirectorV2: React.FC = () => {
 
   const getNodeColor = (blockIdx: number, nodeIdx: number, mode: ViewMode) => {
     // Deterministic mock pattern for visuals
-    const key = (blockIdx * 16) + nodeIdx;
+    const key = (blockIdx * 18) + nodeIdx;
     
     if (mode === 'HEALTH') {
       if (key === 15) return COLORS.health.unhealthy;
-      if (key > 16 && key < 20) return COLORS.health.suspected;
+      if (key > 18 && key < 22) return COLORS.health.suspected;
       if (key === 42) return COLORS.health.unhealthy;
       if (key === 60) return COLORS.health.suspected;
       return COLORS.health.healthy;
@@ -400,7 +429,7 @@ export const ClusterDirectorV2: React.FC = () => {
 
     if (mode === 'MAINTENANCE') {
       if (key > 5 && key < 10) return COLORS.maintenance.inprogress; // pink
-      if (key > 16 && key < 24) return COLORS.maintenance.available; // yellow
+      if (key > 18 && key < 24) return COLORS.maintenance.available; // yellow
       return COLORS.maintenance.uptodate; // blue
     }
     
@@ -627,6 +656,12 @@ export const ClusterDirectorV2: React.FC = () => {
           {/* Legend Footer */}
           <div className="px-4 py-3 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-50/50 rounded-b-lg">
              <div className="flex gap-4 text-[10px] font-medium">
+                 <div className="flex items-center gap-1.5 mr-2 pr-2 border-r border-slate-200">
+                    <div className="w-3 h-2.5 bg-slate-400 rounded-[1px]" />
+                    <span>With VM</span>
+                    <div className="w-3 h-2.5 border border-slate-400 rounded-[1px] ml-1" />
+                    <span>No VM</span>
+                 </div>
                  {viewMode === 'HEALTH' && (
                     <>
                       <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-cyan-300"/> Healthy</div>
@@ -726,34 +761,40 @@ export const ClusterDirectorV2: React.FC = () => {
                        <div key={block.id}>
                           <h5 className="text-[10px] text-slate-500 mb-1.5">{block.label}</h5>
                           <div className="flex flex-wrap gap-1">
-                             {block.nodes.map((_, nodeIdx) => {
-                               const color = getNodeColor(blockIdx, nodeIdx, viewMode);
-                               const isSelected = selectedNode?.sbId === sb.id && selectedNode?.blockId === block.id && selectedNode?.nodeIdx === nodeIdx;
-                               
-                               let status: any;
-                               if (viewMode === 'HEALTH') {
-                                 status = color === COLORS.health.unhealthy ? 'unhealthy' : 
-                                          color === COLORS.health.suspected ? 'degraded' : 'healthy';
-                               } else if (viewMode === 'MAINTENANCE') {
-                                 status = color === COLORS.maintenance.inprogress ? 'inprogress' :
-                                          color === COLORS.maintenance.available ? 'available' : 'uptodate';
-                               } else {
-                                 status = 'healthy';
-                               }
-                               
-                               return (
-                                 <div 
-                                   key={nodeIdx}
-                                   className={`w-6 h-5 rounded-[2px] cursor-pointer transition-all ${isSelected ? 'ring-2 ring-offset-1 ring-slate-400 scale-110 z-10' : 'hover:opacity-80'}`}
-                                   style={{ backgroundColor: color }}
-                                   title={`Node ${nodeIdx}`}
-                                   onClick={() => {
-                                     if (isSelected) setSelectedNode(null);
-                                     else setSelectedNode({ sbId: sb.id, blockId: block.id, nodeIdx, status });
-                                   }}
-                                 ></div>
-                               );
-                             })}
+                              {block.nodes.map((_, nodeIdx) => {
+                                const color = getNodeColor(blockIdx, nodeIdx, viewMode);
+                                const isSelected = selectedNode?.sbId === sb.id && selectedNode?.blockId === block.id && selectedNode?.nodeIdx === nodeIdx;
+                                const hasVM = (nodeIdx + blockIdx * 18) % 7 !== 0;
+                                
+                                let status: any;
+                                if (viewMode === 'HEALTH') {
+                                  status = color === COLORS.health.unhealthy ? 'unhealthy' : 
+                                           color === COLORS.health.suspected ? 'degraded' : 'healthy';
+                                } else if (viewMode === 'MAINTENANCE') {
+                                  status = color === COLORS.maintenance.inprogress ? 'inprogress' :
+                                           color === COLORS.maintenance.available ? 'available' : 'uptodate';
+                                } else {
+                                  status = 'healthy';
+                                }
+                                
+                                return (
+                                  <div 
+                                    key={nodeIdx}
+                                    className={`w-6 h-5 rounded-[2px] cursor-pointer transition-all flex items-center justify-center ${isSelected ? 'ring-2 ring-offset-1 ring-slate-400 scale-110 z-10' : 'hover:opacity-80'}`}
+                                    style={{ 
+                                      backgroundColor: hasVM ? color : 'transparent',
+                                      border: hasVM ? 'none' : `1.5px solid ${color}`
+                                    }}
+                                    title={`Node ${nodeIdx}${!hasVM ? ' (No VM)' : ''}`}
+                                    onClick={() => {
+                                      if (isSelected) setSelectedNode(null);
+                                      else setSelectedNode({ sbId: sb.id, blockId: block.id, nodeIdx, status, hasVM });
+                                    }}
+                                  >
+                                    {!hasVM && <div className="w-1 h-1 rounded-full" style={{ backgroundColor: color }} />}
+                                  </div>
+                                );
+                              })}
                           </div>
                        </div>
                     ))}
@@ -764,6 +805,7 @@ export const ClusterDirectorV2: React.FC = () => {
                         nodeIdx={selectedNode.nodeIdx} 
                         blockLabel={sb.blocks.find(b => b.id === selectedNode.blockId)?.label || ''} 
                         status={selectedNode.status}
+                        hasVM={selectedNode.hasVM}
                       />
                     )}
 

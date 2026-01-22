@@ -174,7 +174,7 @@ const NodeHealthDetail: React.FC<{
       label: 'UNHEALTHY',
       detailLabel: 'Error Code',
       detailValue: 'XID 31 (Memory)',
-      action: <button className="text-[10px] font-bold text-[#1967D2] hover:underline">Drain & Replace</button>
+      action: <button className="text-[10px] font-bold text-[#1967D2] hover:underline">Report & Replace</button>
     }
   }[status];
 
