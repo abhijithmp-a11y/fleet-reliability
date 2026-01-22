@@ -47,7 +47,6 @@ import { FleetEfficiencyDetail } from '@/components/FleetEfficiencyDetail';
 import { ClusterTopology, REGIONS } from '@/components/ClusterTopology';
 import { ClusterDirectorV2 } from '@/components/ClusterDirectorV2';
 import { ProjectTopology } from '@/components/ProjectTopology';
-import { ClusterDetail } from '@/components/ClusterDetail';
 import { ScenarioGuide, SCENARIOS } from '@/components/ScenarioGuide';
 import { JobDetail } from '@/components/WorkloadDetail';
 import { ReservationDetail } from '@/components/ReservationDetail';
@@ -1818,15 +1817,12 @@ export default function App() {
             {activeTab === 'director' && (
                <div className="space-y-4 animate-fadeIn">
                   {view === 'cluster-detail' && selectedClusterId ? (
-                     <ClusterDetail 
+                     <ClusterDirectorV2 
                        clusterId={selectedClusterId}
                        onBack={() => {
                          setView('dashboard');
                          setSelectedClusterId(null);
                        }}
-                       jobs={jobsInScope}
-                       onViewJob={handleViewJob}
-                       onNavigateToJobs={() => handleTabChange('jobs')}
                      />
                   ) : (
                      <ClusterDirectorV2 /> 

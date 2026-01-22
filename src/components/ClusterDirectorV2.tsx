@@ -10,7 +10,8 @@ import {
   RefreshCw, 
   TrendingUp, 
   Plus, 
-  LayoutGrid
+  LayoutGrid,
+  ArrowLeft
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -56,7 +57,10 @@ const MOCK_BLOCKS = [
   {
     id: 'sb1',
     label: 'Super block 1',
-    isOpen: true,
+    isOpen: false,
+    healthyCount: 33,
+    degradedCount: 1,
+    unhealthyCount: 2,
     blocks: [
       { id: 'b1', label: 'Block 1', nodes: Array(18).fill(0) },
       { id: 'b2', label: 'Block 2', nodes: Array(18).fill(0) },
@@ -66,7 +70,9 @@ const MOCK_BLOCKS = [
     id: 'sb2',
     label: 'Super block 2',
     isOpen: false,
-    extraLabel: 'Unhealthy: 1 VMs',
+    healthyCount: 32,
+    degradedCount: 3,
+    unhealthyCount: 1,
     blocks: [
       { id: 'b3', label: 'Block 1', nodes: Array(18).fill(0) },
       { id: 'b4', label: 'Block 2', nodes: Array(18).fill(0) },
@@ -76,6 +82,9 @@ const MOCK_BLOCKS = [
     id: 'sb3',
     label: 'Super block 3',
     isOpen: false,
+    healthyCount: 32,
+    degradedCount: 0,
+    unhealthyCount: 4,
     blocks: [
       { id: 'b5', label: 'Block 1', nodes: Array(18).fill(0) },
       { id: 'b6', label: 'Block 2', nodes: Array(18).fill(0) },
@@ -85,6 +94,9 @@ const MOCK_BLOCKS = [
     id: 'sb4',
     label: 'Super block 4',
     isOpen: false,
+    healthyCount: 36,
+    degradedCount: 0,
+    unhealthyCount: 0,
     blocks: [
       { id: 'b7', label: 'Block 1', nodes: Array(18).fill(0) },
       { id: 'b8', label: 'Block 2', nodes: Array(18).fill(0) },
@@ -379,7 +391,7 @@ const NodeMaintenanceDetail: React.FC<{
   );
 };
 
-export const ClusterDirectorV2: React.FC = () => {
+export const ClusterDirectorV2: React.FC<{ onBack?: () => void; clusterId?: string }> = ({ onBack, clusterId }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('HEALTH');
   const [superBlocks, setSuperBlocks] = useState(MOCK_BLOCKS);
   const [selectedNode, setSelectedNode] = useState<{ 
@@ -407,30 +419,40 @@ export const ClusterDirectorV2: React.FC = () => {
     setSelectedNode(null); // Reset selection when switching modes to avoid status mismatch
   };
 
-  const getNodeColor = (blockIdx: number, nodeIdx: number, mode: ViewMode) => {
+  const getNodeColor = (sbIdx: number, blockIdx: number, nodeIdx: number, mode: ViewMode) => {
     // Deterministic mock pattern for visuals
-    const key = (blockIdx * 18) + nodeIdx;
+    const key = (sbIdx * 36) + (blockIdx * 18) + nodeIdx;
     
     if (mode === 'HEALTH') {
-      if (key === 15) return COLORS.health.unhealthy;
-      if (key > 18 && key < 22) return COLORS.health.suspected;
-      if (key === 42) return COLORS.health.unhealthy;
-      if (key === 60) return COLORS.health.suspected;
+      // SB 0 (sb1): 15 (U), 30 (U), 20 (D)
+      if (sbIdx === 0) {
+        if (key === 15 || key === 30) return COLORS.health.unhealthy;
+        if (key === 20) return COLORS.health.suspected;
+      }
+      // SB 1 (sb2): 42 (U), 50, 51, 52 (D)
+      if (sbIdx === 1) {
+        if (key === 42) return COLORS.health.unhealthy;
+        if (key >= 50 && key <= 52) return COLORS.health.suspected;
+      }
+      // SB 2 (sb3): 80, 81, 90, 91 (U)
+      if (sbIdx === 2) {
+        if (key === 80 || key === 81 || key === 90 || key === 91) return COLORS.health.unhealthy;
+      }
+      
       return COLORS.health.healthy;
     }
 
     if (mode === 'UTILIZATION') {
-      if (key === 21) return COLORS.utilization.straggler;
-      if (key === 45) return COLORS.utilization.straggler;
+      if (key % 15 === 0) return COLORS.utilization.straggler;
       if (key % 3 === 0) return COLORS.utilization.low;
       if (key % 3 === 1) return COLORS.utilization.med;
       return COLORS.utilization.high;
     }
 
     if (mode === 'MAINTENANCE') {
-      if (key > 5 && key < 10) return COLORS.maintenance.inprogress; // pink
-      if (key > 18 && key < 24) return COLORS.maintenance.available; // yellow
-      return COLORS.maintenance.uptodate; // blue
+      if (key % 12 === 0) return COLORS.maintenance.inprogress;
+      if (key % 8 === 0) return COLORS.maintenance.available;
+      return COLORS.maintenance.uptodate;
     }
     
     return '#e2e8f0';
@@ -596,6 +618,19 @@ export const ClusterDirectorV2: React.FC = () => {
   return (
     <div className="space-y-4 font-sans text-slate-900 pb-10">
       
+      {onBack && (
+        <div className="flex justify-between items-center mb-2">
+          <button onClick={onBack} className="text-slate-500 hover:text-[#1967D2] text-xs flex items-center gap-1 font-medium transition-colors">
+            <ArrowLeft size={14} /> Back to fleet
+          </button>
+          {clusterId && (
+            <div className="text-xs text-slate-500">
+              <span className="font-bold text-slate-700">{clusterId}</span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Top Navigation */}
       <div className="flex gap-6 border-b border-slate-200">
          <button className="px-1 py-2 border-b-2 border-[#1967D2] text-[#1967D2] font-bold text-xs">TOPOLOGY</button>
@@ -707,7 +742,15 @@ export const ClusterDirectorV2: React.FC = () => {
 
       {/* Super Blocks List */}
       <div className="space-y-3">
-         {superBlocks.map(sb => (
+         {superBlocks.map((sb, sbIdx) => {
+            const sbMaint = sb.blocks.flatMap((b, bIdx) => 
+              b.nodes.map((_, nIdx) => getNodeColor(sbIdx, bIdx, nIdx, 'MAINTENANCE'))
+            );
+            const sbUpToDate = sbMaint.filter(c => c === COLORS.maintenance.uptodate).length;
+            const sbAvailable = sbMaint.filter(c => c === COLORS.maintenance.available).length;
+            const sbInProgress = sbMaint.filter(c => c === COLORS.maintenance.inprogress).length;
+
+            return (
             <div key={sb.id} className="bg-white border border-slate-200 rounded-lg shadow-sm transition-all">
                {/* Header */}
                <div 
@@ -740,10 +783,38 @@ export const ClusterDirectorV2: React.FC = () => {
                   ) : (
                      // Collapsed Summary
                      <div className="flex items-center gap-4 text-[10px] font-bold">
-                        {sb.extraLabel && (
-                            <div className="flex items-center gap-1 text-rose-600">
-                                <AlertOctagon size={12} className="fill-rose-100" /> {sb.extraLabel}
+                        {viewMode === 'MAINTENANCE' ? (
+                          <>
+                            <div className="flex items-center gap-1 text-blue-600">
+                               <Shield size={12} className="fill-blue-50" /> Up-to-date: {sbUpToDate} VMs
                             </div>
+                            {sbAvailable > 0 && (
+                               <div className="flex items-center gap-1 text-amber-600">
+                                   <RefreshCw size={12} className="animate-spin-slow" /> Available: {sbAvailable} VMs
+                               </div>
+                            )}
+                            {sbInProgress > 0 && (
+                               <div className="flex items-center gap-1 text-pink-600">
+                                   <Play size={12} className="fill-pink-50" /> In progress: {sbInProgress} VMs
+                               </div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-1 text-cyan-600">
+                               <Shield size={12} className="fill-cyan-50" /> Healthy: {sb.healthyCount} VMs
+                            </div>
+                            {sb.degradedCount > 0 && (
+                               <div className="flex items-center gap-1 text-amber-600">
+                                   <AlertTriangle size={12} className="fill-amber-50" /> Degraded: {sb.degradedCount} VMs
+                               </div>
+                            )}
+                            {sb.unhealthyCount > 0 && (
+                               <div className="flex items-center gap-1 text-rose-600">
+                                   <AlertOctagon size={12} className="fill-rose-50" /> Unhealthy: {sb.unhealthyCount} VMs
+                               </div>
+                            )}
+                          </>
                         )}
                         {viewMode === 'MAINTENANCE' && sb.id === 'sb2' && (
                             <div className="flex items-center gap-1 text-rose-600">
@@ -757,14 +828,42 @@ export const ClusterDirectorV2: React.FC = () => {
                {/* Content */}
                {sb.isOpen && (
                  <div className="px-4 pb-4 pt-2 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {sb.blocks.map((block, blockIdx) => (
-                       <div key={block.id}>
-                          <h5 className="text-[10px] text-slate-500 mb-1.5">{block.label}</h5>
-                          <div className="flex flex-wrap gap-1">
+                    {sb.blocks.map((block, blockIdx) => {
+                       const blockHealth = block.nodes.map((_, nodeIdx) => getNodeColor(sbIdx, blockIdx, nodeIdx, 'HEALTH'));
+                       const hCount = blockHealth.filter(c => c === COLORS.health.healthy).length;
+                       const dCount = blockHealth.filter(c => c === COLORS.health.suspected).length;
+                       const uCount = blockHealth.filter(c => c === COLORS.health.unhealthy).length;
+
+                       const blockMaint = block.nodes.map((_, nodeIdx) => getNodeColor(sbIdx, blockIdx, nodeIdx, 'MAINTENANCE'));
+                       const mUpToDate = blockMaint.filter(c => c === COLORS.maintenance.uptodate).length;
+                       const mAvailable = blockMaint.filter(c => c === COLORS.maintenance.available).length;
+                       const mInProgress = blockMaint.filter(c => c === COLORS.maintenance.inprogress).length;
+
+                       return (
+                        <div key={block.id}>
+                           <div className="flex justify-between items-center mb-1.5">
+                              <h5 className="text-[10px] text-slate-500">{block.label}</h5>
+                              <div className="flex gap-2 text-[9px] font-bold">
+                                 {viewMode === 'MAINTENANCE' ? (
+                                   <>
+                                     <span className="text-blue-600">U: {mUpToDate}</span>
+                                     {mAvailable > 0 && <span className="text-amber-600">A: {mAvailable}</span>}
+                                     {mInProgress > 0 && <span className="text-pink-600">P: {mInProgress}</span>}
+                                   </>
+                                 ) : (
+                                   <>
+                                     <span className="text-cyan-600">H: {hCount}</span>
+                                     {dCount > 0 && <span className="text-amber-600">D: {dCount}</span>}
+                                     {uCount > 0 && <span className="text-rose-600">U: {uCount}</span>}
+                                   </>
+                                 )}
+                              </div>
+                           </div>
+                           <div className="flex flex-wrap gap-1">
                               {block.nodes.map((_, nodeIdx) => {
-                                const color = getNodeColor(blockIdx, nodeIdx, viewMode);
+                                const color = getNodeColor(sbIdx, blockIdx, nodeIdx, viewMode);
                                 const isSelected = selectedNode?.sbId === sb.id && selectedNode?.blockId === block.id && selectedNode?.nodeIdx === nodeIdx;
-                                const hasVM = (nodeIdx + blockIdx * 18) % 7 !== 0;
+                                const hasVM = (nodeIdx + blockIdx * 18 + sbIdx * 36) % 7 !== 0;
                                 
                                 let status: any;
                                 if (viewMode === 'HEALTH') {
@@ -795,9 +894,10 @@ export const ClusterDirectorV2: React.FC = () => {
                                   </div>
                                 );
                               })}
-                          </div>
-                       </div>
-                    ))}
+                           </div>
+                        </div>
+                       );
+                    })}
 
                     {/* Inline Health Detail */}
                     {selectedNode && selectedNode.sbId === sb.id && viewMode === 'HEALTH' && (
@@ -820,7 +920,8 @@ export const ClusterDirectorV2: React.FC = () => {
                  </div>
                )}
             </div>
-         ))}
+          );
+         })}
       </div>
 
     </div>
